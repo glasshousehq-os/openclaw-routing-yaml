@@ -12,11 +12,15 @@
  *     register(api) { api.on("before_model_resolve", handler); },
  *   });
  *
- * We DO NOT import `openclaw/plugin-sdk/*` at the top level so the package
- * stays installable as a plain npm dep and tests can run without the host
- * runtime present. Instead, we resolve `definePluginEntry` dynamically at
- * load time. If the runtime ever calls a non-OpenClaw process to import
- * this module, the dynamic import fails closed — no override emitted.
+ * `openclaw` is declared as an OPTIONAL peerDependency — the host gateway
+ * provides it at runtime. We resolve `definePluginEntry` synchronously via
+ * `createRequire(import.meta.url)` so this module has NO top-level await
+ * (top-level await produces `dist/index.js` that fails to load under the
+ * OpenClaw plugin loader — see v0.1.0 -> v0.1.1 fix notes in README).
+ *
+ * Library-mode fallback: if the SDK isn't resolvable (unit tests, standalone
+ * library import in a non-OpenClaw process), we identity-pass the
+ * definition so the module still loads and the named exports remain usable.
  *
  * The hook signature is taken verbatim from openclaw/openclaw main:
  *   src/plugins/hook-before-agent-start.types.ts
@@ -24,6 +28,7 @@
  *     PluginHookBeforeModelResolveEvent  -> { prompt; attachments? }
  *     PluginHookBeforeModelResolveResult -> { modelOverride?; providerOverride? }
  */
+import { createRequire } from "node:module";
 import { loadRoutingConfig } from "./loader.js";
 import {
   decide,
@@ -155,64 +160,71 @@ export function buildRuntimeConfig(
 }
 
 /**
- * The default export — OpenClaw's plugin loader calls this with the runtime
- * `api` object. We delay the SDK import so the package stays usable as a
- * pure-library import from tests.
+ * Resolve `definePluginEntry` from the host-provided `openclaw` package
+ * synchronously. We use `createRequire` rather than `import()` so the
+ * resolution happens at module-load time with NO top-level await — that
+ * top-level await is exactly what broke v0.1.0 under the OpenClaw plugin
+ * loader.
+ *
+ * If the SDK isn't installed (standalone library use, unit tests, dry
+ * inspection), we fall through to an identity wrapper so the module still
+ * loads cleanly.
  */
-async function buildDefaultExport(): Promise<PluginEntryDefinition> {
-  // Try the focused SDK subpath first (current canonical). Fall back to root
-  // barrel for older OpenClaw builds; this matches docs/plugins/building-plugins.md.
-  let definePluginEntry:
-    | ((def: PluginEntryDefinition) => PluginEntryDefinition)
-    | null = null;
+function resolveDefinePluginEntry(): (def: PluginEntryDefinition) => PluginEntryDefinition {
   try {
-    // The OpenClaw SDK is a peer / host-provided dep — NOT in our package.json.
-    // We resolve it via a dynamic-string `import()` so the TypeScript compiler
-    // doesn't try to type-resolve the missing module at build time.
-    const sdkSpecifier: string = "openclaw/plugin-sdk/plugin-entry";
-    const mod = (await import(/* @vite-ignore */ sdkSpecifier)) as {
-      definePluginEntry?: (def: PluginEntryDefinition) => PluginEntryDefinition;
-    };
-    if (mod.definePluginEntry) definePluginEntry = mod.definePluginEntry;
+    const require = createRequire(import.meta.url);
+    const mod: unknown = require("openclaw/plugin-sdk/plugin-entry");
+    if (
+      mod !== null &&
+      typeof mod === "object" &&
+      "definePluginEntry" in mod &&
+      typeof (mod as { definePluginEntry: unknown }).definePluginEntry === "function"
+    ) {
+      return (mod as { definePluginEntry: (def: PluginEntryDefinition) => PluginEntryDefinition })
+        .definePluginEntry;
+    }
   } catch {
     // SDK not present (library use or unit test): identity-pass the definition.
   }
-  const def: PluginEntryDefinition = {
-    id: "routing-yaml",
-    name: "Routing YAML",
-    description: "Routes each agent turn to a model per task class via routing.yaml.",
-    register(api: PluginApiLike): void {
-      const pluginCfg = readPluginConfig(api);
-      const runtime = buildRuntimeConfig(pluginCfg, api.logger);
-      if (!runtime) {
-        api.logger?.warn(
-          "[routing-yaml] routing.yaml unavailable; plugin will no-op (no model override).",
-        );
-        return;
-      }
-      api.on(
-        "before_model_resolve",
-        async (event: BeforeModelResolveEvent): Promise<BeforeModelResolveResult | undefined> => {
-          try {
-            const decision = decide(event, runtime);
-            const result = toHookResult(decision);
-            // Empty object -> undefined keeps the hook a true no-op for the
-            // orchestrator instead of stamping a no-op record in setup.ts.
-            return Object.keys(result).length > 0 ? result : undefined;
-          } catch (err) {
-            api.logger?.error(`[routing-yaml] hook threw: ${String(err)}`);
-            return undefined;
-          }
-        },
-      );
-      api.logger?.info(
-        "[routing-yaml] before_model_resolve hook registered; routing.yaml live.",
-      );
-    },
-  };
-  return definePluginEntry ? definePluginEntry(def) : def;
+  return (def) => def;
 }
 
-// Top-level default export. Resolved lazily so the dynamic import doesn't
-// run until the OpenClaw runtime actually loads this entry.
-export default await buildDefaultExport();
+const definePluginEntry = resolveDefinePluginEntry();
+
+/**
+ * The default export — OpenClaw's plugin loader reads this directly. No
+ * top-level await; the SDK wrapper is resolved synchronously above.
+ */
+export default definePluginEntry({
+  id: "routing-yaml",
+  name: "Routing YAML",
+  description: "Routes each agent turn to a model per task class via routing.yaml.",
+  register(api: PluginApiLike): void {
+    const pluginCfg = readPluginConfig(api);
+    const runtime = buildRuntimeConfig(pluginCfg, api.logger);
+    if (!runtime) {
+      api.logger?.warn(
+        "[routing-yaml] routing.yaml unavailable; plugin will no-op (no model override).",
+      );
+      return;
+    }
+    api.on(
+      "before_model_resolve",
+      async (event: BeforeModelResolveEvent): Promise<BeforeModelResolveResult | undefined> => {
+        try {
+          const decision = decide(event, runtime);
+          const result = toHookResult(decision);
+          // Empty object -> undefined keeps the hook a true no-op for the
+          // orchestrator instead of stamping a no-op record in setup.ts.
+          return Object.keys(result).length > 0 ? result : undefined;
+        } catch (err) {
+          api.logger?.error(`[routing-yaml] hook threw: ${String(err)}`);
+          return undefined;
+        }
+      },
+    );
+    api.logger?.info(
+      "[routing-yaml] before_model_resolve hook registered; routing.yaml live.",
+    );
+  },
+});

@@ -56,8 +56,8 @@ ClawHub or npm.
 # Via ClawHub (once published).
 openclaw plugins install clawhub:@glasshousehq/openclaw-routing-yaml
 
-# Or via npm.
-openclaw plugins install npm:@glasshousehq/openclaw-routing-yaml
+# Or via npm (pin the version explicitly).
+openclaw plugins install npm:@glasshousehq/openclaw-routing-yaml@0.1.1
 
 # Or local development.
 openclaw plugins install --link ./openclaw-routing-yaml
@@ -223,6 +223,35 @@ integration surface.
   spawning (Anthropic enforces depth=1).
 - **No silent fallback to Sonnet/Haiku** — anywhere, ever. Lint AND runtime
   refuse.
+
+## Release notes
+
+### v0.1.1 (2026-06-11)
+
+Fix: the v0.1.0 plugin entry used a top-level `await` to lazily resolve the
+host SDK. ESM permits top-level await, but the resulting `dist/index.js`
+failed to load under the OpenClaw plugin loader with:
+
+```
+SyntaxError: await is only valid in async functions and the top level bodies of modules
+```
+
+v0.1.1 refactors the entry to a fully synchronous module shape:
+
+- `openclaw` is now declared as an optional `peerDependency` (`>=2026.4.0`)
+  so it stays host-provided.
+- `definePluginEntry` is resolved synchronously via `createRequire` at
+  module-load time. No top-level await.
+- Library-mode fallback preserved: if the host SDK isn't installed (unit
+  tests, standalone library use), the entry identity-passes the definition.
+- All 60 existing tests pass unchanged; public API is identical to v0.1.0.
+
+No behaviour changes — routing.yaml, classifier, hook semantics, and emitted
+events are identical to v0.1.0.
+
+### v0.1.0 (2026-06-11)
+
+Initial public release.
 
 ## License
 
