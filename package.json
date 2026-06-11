@@ -1,6 +1,6 @@
 {
   "name": "@glasshousehq/openclaw-routing-yaml",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "OpenClaw plugin that routes agent turns to different models per task class, driven by a declarative routing.yaml. Implements the `before_model_resolve` hook with deterministic prompt+attachment classification, quarantine guardrails, cost-cliff warnings, and degraded-mode park-and-notify for regulated workloads.",
   "type": "module",
   "main": "./dist/index.js",

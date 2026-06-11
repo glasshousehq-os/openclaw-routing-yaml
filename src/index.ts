@@ -49,7 +49,13 @@ export {
   type PluginRuntimeConfig,
 } from "./plugin.js";
 export { classify, type TaskClass, type ClassifyInput } from "./classifier.js";
-export { applyRule, type RouterDecision, type RouterEvent } from "./router.js";
+export {
+  applyRule,
+  DEFAULT_MODEL_MAP,
+  DEFAULT_PROVIDER_MAP,
+  type RouterDecision,
+  type RouterEvent,
+} from "./router.js";
 export {
   RoutingConfigSchema,
   crossCheck,
@@ -67,6 +73,7 @@ export interface RoutingYamlPluginConfig {
   regulatedClientTag?: boolean;
   extraRegulatedKeywords?: string[];
   providerMap?: Record<string, string>;
+  modelMap?: Record<string, string>;
   notifyChannelOverride?: string;
 }
 
@@ -135,6 +142,7 @@ export function buildRuntimeConfig(
     regulatedClientTag: pluginConfig.regulatedClientTag ?? false,
     extraRegulatedKeywords: pluginConfig.extraRegulatedKeywords,
     providerMap: pluginConfig.providerMap,
+    modelMap: pluginConfig.modelMap,
     notifyChannelOverride: pluginConfig.notifyChannelOverride,
     logger,
     // v1 doesn't ship a token estimator. Heuristic long-context detection

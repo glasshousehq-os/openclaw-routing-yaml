@@ -2,7 +2,7 @@
   "id": "routing-yaml",
   "name": "Routing YAML",
   "description": "Routes each agent turn to a model picked by a declarative routing.yaml file. Classifies the turn (code, long-context, web research, compliance, copy, strategy, etc.), looks up the rule, and applies the override via before_model_resolve. Enforces quarantined-model approval, cost-cliff warnings, and regulated-client park-and-notify.",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "contracts": {
     "hooks": ["before_model_resolve"]
   },
@@ -50,7 +50,12 @@
       "providerMap": {
         "type": "object",
         "additionalProperties": { "type": "string" },
-        "description": "Optional family-name -> provider id map (e.g. opus-4.7 -> anthropic). When unset, the override emits modelOverride only and the orchestrator's provider routing picks the provider."
+        "description": "Optional family-name -> provider id map (e.g. opus-4.7 -> anthropic). When unset, falls back to DEFAULT_PROVIDER_MAP for known Anthropic families."
+      },
+      "modelMap": {
+        "type": "object",
+        "additionalProperties": { "type": "string" },
+        "description": "Optional family-name -> SDK model id map (e.g. opus-4.7 -> claude-opus-4-7). When unset, falls back to DEFAULT_MODEL_MAP for known Anthropic families. Per-fleet overrides take precedence so non-Anthropic providers (OpenAI, Google, Perplexity) can resolve their SDK strings."
       },
       "notifyChannelOverride": {
         "type": "string",

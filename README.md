@@ -57,7 +57,7 @@ ClawHub or npm.
 openclaw plugins install clawhub:@glasshousehq/openclaw-routing-yaml
 
 # Or via npm (pin the version explicitly).
-openclaw plugins install npm:@glasshousehq/openclaw-routing-yaml@0.1.1
+openclaw plugins install npm:@glasshousehq/openclaw-routing-yaml@0.1.2
 
 # Or local development.
 openclaw plugins install --link ./openclaw-routing-yaml
@@ -108,8 +108,18 @@ authoritative Zod schema.
           // Mark this agent as serving a regulated client so degraded-mode
           // park-and-notify fires on primary outage.
           regulatedClientTag: false,
-          // Optional family-name -> provider id map; usually unset.
-          // providerMap: { "opus-4.7": "anthropic", "gpt-5.3-codex": "openai" },
+          // Optional family-name -> provider id map. When unset, falls back to
+          // DEFAULT_PROVIDER_MAP (Anthropic families). Add entries here for
+          // non-Anthropic providers (OpenAI, Google, Perplexity).
+          // providerMap: { "gpt-5.3-codex": "openai", "gemini-3.1-pro": "google" },
+          // Optional family-name -> SDK model id map. When unset, falls back
+          // to DEFAULT_MODEL_MAP (Anthropic: opus-4.7 -> claude-opus-4-7,
+          // sonnet-4.6 -> claude-sonnet-4-6, etc). Add per-fleet entries here
+          // for non-Anthropic SDK strings so they resolve correctly.
+          // modelMap: {
+          //   "gpt-5.3-codex": "openai/gpt-5.3-codex-2026-05",
+          //   "gemini-3.1-pro": "google/gemini-3.1-pro-001",
+          // },
           // Optional Graphiti-style explicit task class override.
           // callerTaskClass: "ner_structured_extraction",
         },
@@ -225,6 +235,42 @@ integration surface.
   refuse.
 
 ## Release notes
+
+### v0.1.2 (2026-06-11)
+
+Fix: the v0.1.0 / v0.1.1 plugin returned `modelOverride` as the routing.yaml
+family-tier id (e.g. `opus-4.7`), but OpenClaw's `before_model_resolve` hook
+expects the SDK-canonical model id (e.g. `claude-opus-4-7`). Enabling the
+plugin against a real gateway therefore overrode every turn to a non-existent
+model ref.
+
+v0.1.2 fixes the contract:
+
+- New `DEFAULT_MODEL_MAP` baked in for the canonical Anthropic families
+  (`opus-4.7` -> `claude-opus-4-7`, `sonnet-4.6` -> `claude-sonnet-4-6`,
+  `haiku-4.5` -> `claude-haiku-4-5-20251001`, plus `opus-4.6`, `opus-4.8`,
+  `sonnet-4.5`). Clean install Just Works on Anthropic-only fleets.
+- New `DEFAULT_PROVIDER_MAP` baked in so Anthropic families resolve to the
+  `anthropic` provider id without per-bot `providerMap` config.
+- New `modelMap` config field (and runtime `ApplyRuleInput.modelMap`) lets a
+  fleet plumb in non-Anthropic SDK strings (OpenAI, Google, Perplexity) or
+  override the default Anthropic mapping (e.g. to route Opus through
+  `claude-cli/claude-opus-4-7` instead).
+- Per-fleet `modelMap` and `providerMap` entries always take precedence over
+  the baked-in defaults. Unknown family-tier ids pass through unchanged so the
+  orchestrator either resolves them via its own catalog OR fails loud (which
+  is the signal that the per-fleet config should add a mapping).
+- `RouterDecision` now exposes both `familyTierModel` (routing.yaml family
+  name, for logging / debugging) and `modelOverride` (SDK-canonical id sent
+  to the hook). Plugin decision log lines now include `family_tier_model`.
+- 5 new router tests + 2 plugin test updates. 65 tests total, all green.
+- No `routing.yaml` schema change. No breaking change to the OpenClaw hook
+  contract. Plugin id, plugin config schema, and observable side events are
+  backward-compatible additions.
+
+Upgrade path: `npm i @glasshousehq/openclaw-routing-yaml@^0.1.2`. No config
+changes required for Anthropic-only fleets. Fleets using non-Anthropic
+providers should add a `modelMap` entry per family.
 
 ### v0.1.1 (2026-06-11)
 

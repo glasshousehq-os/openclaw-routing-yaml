@@ -55,6 +55,10 @@ export interface PluginRuntimeConfig {
   extraRegulatedKeywords?: string[];
   /** Family-name -> provider id (rarely set). */
   providerMap?: Record<string, string>;
+  /** Family-name -> SDK model id (e.g. opus-4.7 -> claude-opus-4-7).
+   *  When unset, the router falls back to DEFAULT_MODEL_MAP for the canonical
+   *  Anthropic families. Per-bot overrides take precedence. */
+  modelMap?: Record<string, string>;
   /** Override the notify_channel from routing.yaml. */
   notifyChannelOverride?: string;
   /** Token estimator. If unset, long-context-recall classifier won't fire. */
@@ -103,6 +107,7 @@ export function decide(
     regulatedClientTag: cfg.regulatedClientTag,
     primaryUnreachable: cfg.isPrimaryUnreachable?.() ?? false,
     providerMap: cfg.providerMap,
+    modelMap: cfg.modelMap,
     notifyChannelOverride: cfg.notifyChannelOverride,
   });
 
@@ -118,6 +123,7 @@ export function decide(
       task_class: classification.taskClass,
       classifier_reason: classification.reason,
       matched_rule: decision.matchedRule,
+      family_tier_model: decision.familyTierModel,
       model_override: decision.modelOverride,
       provider_override: decision.providerOverride,
       decision_reason: decision.reason,

@@ -31,7 +31,11 @@ describe("decide()", () => {
       runtime,
     );
     expect(decision.taskClass).toBe("compliance_review");
-    expect(decision.modelOverride).toBe("opus-4.7");
+    // modelOverride is now the SDK-canonical id (claude-opus-4-7), familyTierModel
+    // exposes the routing.yaml family name for logging / debugging.
+    expect(decision.familyTierModel).toBe("opus-4.7");
+    expect(decision.modelOverride).toBe("claude-opus-4-7");
+    expect(decision.providerOverride).toBe("anthropic");
     expect(decision.matchedRule).toBe("compliance_routing");
   });
 
@@ -41,13 +45,15 @@ describe("decide()", () => {
     });
     const decision = decide({ prompt: "anything" }, runtime);
     expect(decision.taskClass).toBe("ner_structured_extraction");
-    expect(decision.modelOverride).toBe("sonnet-4.6");
+    expect(decision.familyTierModel).toBe("sonnet-4.6");
+    expect(decision.modelOverride).toBe("claude-sonnet-4-6");
     expect(emitted.some((e) => e.kind === "APPROVAL_REQUIRED")).toBe(true);
   });
 
   it("toHookResult drops empty overrides to undefined keys", () => {
     const result = toHookResult({
       modelOverride: null,
+      familyTierModel: null,
       providerOverride: null,
       matchedRule: null,
       reason: "x",
@@ -61,7 +67,8 @@ describe("decide()", () => {
 
   it("toHookResult includes both fields when set", () => {
     const result = toHookResult({
-      modelOverride: "opus-4.7",
+      modelOverride: "claude-opus-4-7",
+      familyTierModel: "opus-4.7",
       providerOverride: "anthropic",
       matchedRule: "compliance_routing",
       reason: "x",
@@ -69,7 +76,7 @@ describe("decide()", () => {
       taskClass: "compliance_review",
       classifierReason: "x",
     });
-    expect(result.modelOverride).toBe("opus-4.7");
+    expect(result.modelOverride).toBe("claude-opus-4-7");
     expect(result.providerOverride).toBe("anthropic");
   });
 

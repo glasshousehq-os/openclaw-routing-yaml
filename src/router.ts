@@ -51,8 +51,14 @@ export type RouterEvent =
     };
 
 export interface RouterDecision {
-  /** Model the plugin wants to apply via modelOverride. `null` means no override. */
+  /** Model the plugin wants to apply via modelOverride. `null` means no override.
+   *  This is the SDK-canonical id when `modelMap` resolves it (e.g.
+   *  `claude-opus-4-7`), otherwise the stable family-tier id from
+   *  routing.yaml (e.g. `opus-4.7`). */
   modelOverride: string | null;
+  /** Family-tier id from routing.yaml (e.g. `opus-4.7`). Exposed for logging
+   *  / debugging; this is the un-mapped value before `modelMap` resolution. */
+  familyTierModel: string | null;
   /** Provider override, only set if providerMap is configured for this model. */
   providerOverride: string | null;
   /** Matched routing rule name, or null when defaults applied. */
@@ -72,6 +78,11 @@ export interface ApplyRuleInput {
   primaryUnreachable?: boolean;
   /** Optional model-family -> provider id map; usually unset. */
   providerMap?: Record<string, string>;
+  /** Optional model-family -> SDK model id map. When unset, falls back to
+   *  `DEFAULT_MODEL_MAP` for known Anthropic families; unknown families pass
+   *  through unchanged (orchestrator likely fails the override — that's the
+   *  signal the per-fleet config should add a mapping). */
+  modelMap?: Record<string, string>;
   /** Override the notify_channel from the config. */
   notifyChannelOverride?: string;
   /** A list of explicit caller tags merged into rule predicate hints. v1 uses
@@ -157,6 +168,53 @@ function defaultForTaskClass(cfg: RoutingConfig, taskClass: TaskClass): string |
 // Cost-cliff warnings
 // -------------------------------------------------------------------------
 
+// -------------------------------------------------------------------------
+// Default family-tier -> SDK model id map
+// -------------------------------------------------------------------------
+//
+// Baked in so a fresh `enabled: true` install Just Works on a fleet using the
+// canonical routing.yaml families. Per-bot overrides via `modelMap` config
+// take precedence. Last verified against OpenClaw model catalog 11 Jun 2026.
+//
+// Non-Anthropic families intentionally pass through unchanged in v1 — adding
+// a default OpenAI/Google map would require version-tracking SDK strings across
+// providers we don't fully control. Per-fleet `modelMap` override is the seam.
+export const DEFAULT_MODEL_MAP: Readonly<Record<string, string>> = Object.freeze({
+  "opus-4.7": "claude-opus-4-7",
+  "opus-4.6": "claude-opus-4-6",
+  "opus-4.8": "claude-opus-4-8",
+  "sonnet-4.6": "claude-sonnet-4-6",
+  "sonnet-4.5": "claude-sonnet-4-5",
+  "haiku-4.5": "claude-haiku-4-5-20251001",
+});
+
+// Same shape for provider mapping. Anthropic families default to anthropic;
+// callers can still override via providerMap for claude-cli routing etc.
+export const DEFAULT_PROVIDER_MAP: Readonly<Record<string, string>> = Object.freeze({
+  "opus-4.7": "anthropic",
+  "opus-4.6": "anthropic",
+  "opus-4.8": "anthropic",
+  "sonnet-4.6": "anthropic",
+  "sonnet-4.5": "anthropic",
+  "haiku-4.5": "anthropic",
+});
+
+function resolveSdkModelId(
+  familyTier: string,
+  callerMap: Record<string, string> | undefined,
+): string {
+  // Caller map wins; baked-in map is the floor; unknown -> pass through.
+  return callerMap?.[familyTier] ?? DEFAULT_MODEL_MAP[familyTier] ?? familyTier;
+}
+
+function resolveProviderId(
+  familyTier: string,
+  callerMap: Record<string, string> | undefined,
+): string | null {
+  // Caller map wins; baked-in map is the floor; unknown -> null (no provider override).
+  return callerMap?.[familyTier] ?? DEFAULT_PROVIDER_MAP[familyTier] ?? null;
+}
+
 function buildCostCliffEvents(
   cfg: RoutingConfig,
   modelId: string,
@@ -216,6 +274,7 @@ export function applyRule(cfg: RoutingConfig, input: ApplyRuleInput): RouterDeci
     });
     return {
       modelOverride: null,
+      familyTierModel: null,
       providerOverride: null,
       matchedRule: null,
       reason: "PARK_AND_NOTIFY: regulated client + primary unreachable",
@@ -296,12 +355,21 @@ export function applyRule(cfg: RoutingConfig, input: ApplyRuleInput): RouterDeci
     events.push(...buildCostCliffEvents(cfg, chosenModel, input.estimatedInputTokens));
   }
 
-  // 4. Provider override (if mapped).
-  const providerOverride =
-    chosenModel && input.providerMap ? input.providerMap[chosenModel] ?? null : null;
+  // 4. Resolve family-tier id -> SDK model id + provider id.
+  //    Caller maps (from per-bot config) win; baked-in DEFAULT_MODEL_MAP /
+  //    DEFAULT_PROVIDER_MAP catch the common case so a clean install routes
+  //    to a real SDK id without per-bot config.
+  const familyTierModel = chosenModel;
+  const sdkModelOverride = chosenModel
+    ? resolveSdkModelId(chosenModel, input.modelMap)
+    : null;
+  const providerOverride = chosenModel
+    ? resolveProviderId(chosenModel, input.providerMap)
+    : null;
 
   return {
-    modelOverride: chosenModel,
+    modelOverride: sdkModelOverride,
+    familyTierModel,
     providerOverride,
     matchedRule: matchedRuleName,
     reason,
