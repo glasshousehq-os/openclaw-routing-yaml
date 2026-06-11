@@ -1,0 +1,61 @@
+{
+  "id": "routing-yaml",
+  "name": "Routing YAML",
+  "description": "Routes each agent turn to a model picked by a declarative routing.yaml file. Classifies the turn (code, long-context, web research, compliance, copy, strategy, etc.), looks up the rule, and applies the override via before_model_resolve. Enforces quarantined-model approval, cost-cliff warnings, and regulated-client park-and-notify.",
+  "version": "0.1.0",
+  "contracts": {
+    "hooks": ["before_model_resolve"]
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "routingYamlPath": {
+        "type": "string",
+        "description": "Absolute path to routing.yaml. Falls back to env ROUTING_YAML_PATH, then ~/.openclaw/workspace/routing.yaml, then graceful no-op."
+      },
+      "callerTaskClass": {
+        "type": "string",
+        "description": "Optional explicit task class override. When set, skips the heuristic classifier (used by Graphiti for ner_structured_extraction).",
+        "enum": [
+          "text",
+          "code_agent_loop",
+          "code_one_shot",
+          "long_context_recall",
+          "web_research_fanout",
+          "compliance_review",
+          "client_copy",
+          "strategy",
+          "bulk_classify",
+          "ner_structured_extraction",
+          "image",
+          "video_hero",
+          "video_social_bulk",
+          "voice",
+          "vision"
+        ]
+      },
+      "regulatedClientTag": {
+        "type": "boolean",
+        "description": "Set true when this agent serves a regulated client (TGA/AHPRA/AFSL/etc.). Enables PARK_AND_NOTIFY behavior on primary outage."
+      },
+      "extraRegulatedKeywords": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Additional case-insensitive keywords that mark a prompt as compliance_review."
+      },
+      "providerMap": {
+        "type": "object",
+        "additionalProperties": { "type": "string" },
+        "description": "Optional family-name -> provider id map (e.g. opus-4.7 -> anthropic). When unset, the override emits modelOverride only and the orchestrator's provider routing picks the provider."
+      },
+      "notifyChannelOverride": {
+        "type": "string",
+        "description": "Override the routing.yaml notify_channel for PARK_AND_NOTIFY events."
+      }
+    }
+  }
+}

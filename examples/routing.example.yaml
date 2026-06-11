@@ -1,0 +1,133 @@
+# =============================================================================
+# Sample routing.yaml for openclaw-routing-yaml.
+#
+# This is a SANITISED EXAMPLE only — replace every model id, regulated-client
+# name, and threshold with values appropriate to your org. The shapes here
+# match the Zod schema in `src/schema.ts`; if validation fails, run the lint
+# from your editor + check `crossCheck()` warnings.
+#
+# The plugin reads this file (default path ~/.openclaw/workspace/routing.yaml,
+# override via ROUTING_YAML_PATH env or `routingYamlPath` plugin config) and
+# uses it to override the orchestrator's primary model per task class.
+# =============================================================================
+
+provenance:
+  version: "0.1.0"
+  blueprint_alignment: "your-routing-spec-here.md"
+  last_updated: "2026-06-01"
+  next_review: "2026-12-01"
+  locked_decisions:
+    - "Example file — replace before using."
+
+# What each task class routes to when no rule matches.
+defaults:
+  text: primary-text
+  code_agent_loop: primary-code
+  code_one_shot: primary-text
+  long_context_recall: primary-long-context
+  web_research_fanout: primary-search
+  image: primary-image
+  image_product_colour_critical: primary-image-fidelity
+  video_hero: primary-video-hero
+  video_social_bulk: primary-video-bulk
+  voice: primary-voice
+  ner_structured_extraction: primary-text
+  vision: primary-text
+
+# Universal guardrail framework.
+guardrails:
+  sonnet_use_requires_approval: true
+  haiku_use_requires_approval: true
+  quarterly_revaluation_gate: "2026-09-01"
+  sonnet_next_version_auto_revaluation: true
+  cost_trigger_review_per_category_per_month_usd: 300
+
+  max_concurrent_subagents: 5
+  max_subagent_depth: 1
+  multi_agent_token_budget_warning_multiplier: 15
+
+  # Cost-cliff thresholds — emit a warning when projected input tokens cross.
+  # Key is matched as a case-insensitive prefix against the chosen model id.
+  cost_cliff_warn:
+    primary-large:
+      threshold_tokens: 272000
+      note: "Tiered pricing above 272K tokens — verify cost projection."
+    primary-long-context:
+      threshold_tokens: 200000
+      note: "Tiered pricing above 200K tokens — verify cost projection."
+
+# How the system behaves when the primary provider is unavailable.
+degraded_mode:
+  trigger: "primary unavailable for >15 minutes OR sustained 5xx rate >20% across 5 min"
+  regulated_clients_action: PARK_AND_NOTIFY
+  regulated_clients:
+    - "Example Regulated Client A"
+    - "Example Regulated Client B"
+  notify_channel: "log://stdout"
+  non_regulated_fallback:
+    text_default:
+      primary_model: primary-text
+      fallbacks:
+        - secondary-text
+        - tertiary-text
+  outage_contract:
+    avoid_window_aest: "22:00-02:00"
+    avoid_window_reason: "Provider peak window in their home region."
+    max_parallel_subagents_per_batch: 3
+    stagger_seconds_between_batches: [30, 60]
+    brief_must_include_fallback_clause: true
+    retry_loop_forbidden: true
+
+# Predicate -> routing decision. First match wins.
+rules:
+  - name: "compliance_routing"
+    when: 'tags contains_any ["regulated", "compliance"]'
+    use: primary-text
+    effort: high
+    double_pass: true
+    override_blocked: true
+    provenance: U
+
+  - name: "client_copy_brand_voice"
+    when: 'tags contains "client_copy"'
+    use: primary-text
+    override_blocked: true
+    provenance: U
+
+  - name: "long_context_recall_route"
+    when: "estimated_input_tokens > 500000"
+    use: primary-long-context
+    escalate_synthesis_to: primary-text
+    provenance: U
+
+  - name: "code_agent_loop"
+    when: 'tags contains "code" and intent == "agent_loop"'
+    use: primary-code
+    provenance: U
+
+  - name: "code_one_shot_design_led"
+    when: 'tags contains "code" and intent == "one_shot_design_led"'
+    use: primary-text
+    provenance: U
+
+  - name: "research_multi_agent_pipeline"
+    when: 'tags contains "research_multi_agent"'
+    pipeline:
+      - primary-text
+      - primary-search
+      - primary-long-context
+      - primary-text
+    provenance: U
+
+  - name: "image_default"
+    when: 'tags contains "image"'
+    use: primary-image
+    provenance: U
+
+  - name: "voice_agent"
+    when: 'tags contains "voice"'
+    use: primary-voice
+    provenance: U
+
+# Verbatim record of any quarantined-model exceptions.
+named_exceptions: []

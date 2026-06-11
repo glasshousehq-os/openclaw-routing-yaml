@@ -1,0 +1,81 @@
+{
+  "name": "openclaw-routing-yaml",
+  "version": "0.1.0",
+  "description": "OpenClaw plugin that routes agent turns to different models per task class, driven by a declarative routing.yaml. Implements the `before_model_resolve` hook with deterministic prompt+attachment classification, quarantine guardrails, cost-cliff warnings, and degraded-mode park-and-notify for regulated workloads.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./classifier": {
+      "import": "./dist/classifier.js",
+      "types": "./dist/classifier.d.ts"
+    },
+    "./schema": {
+      "import": "./dist/schema.js",
+      "types": "./dist/schema.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "model-routing",
+    "task-routing",
+    "claude",
+    "anthropic",
+    "openai",
+    "gemini",
+    "ai",
+    "llm",
+    "router"
+  ],
+  "author": "Glasshouse (Blake Mitchell)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/glasshouse-group/openclaw-routing-yaml"
+  },
+  "homepage": "https://github.com/glasshouse-group/openclaw-routing-yaml",
+  "bugs": {
+    "url": "https://github.com/glasshouse-group/openclaw-routing-yaml/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "yaml": "^2.5.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0",
+    "vitest": "^1.6.0"
+  },
+  "openclaw": {
+    "extensions": ["./dist/index.js"],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": "2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.3.24-beta.2",
+      "pluginSdkVersion": "2026.3.24-beta.2"
+    }
+  }
+}
