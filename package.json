@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-routing-yaml",
+  "name": "@glasshousehq/openclaw-routing-yaml",
   "version": "0.1.0",
   "description": "OpenClaw plugin that routes agent turns to different models per task class, driven by a declarative routing.yaml. Implements the `before_model_resolve` hook with deterministic prompt+attachment classification, quarantine guardrails, cost-cliff warnings, and degraded-mode park-and-notify for regulated workloads.",
   "type": "module",
@@ -45,15 +45,15 @@
     "llm",
     "router"
   ],
-  "author": "Glasshouse (Blake Mitchell)",
+  "author": "Glasshouse <hello@glasshousehq.com.au> (https://glasshousehq.com.au)",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/glasshouse-group/openclaw-routing-yaml"
+    "url": "git+https://github.com/glasshousehq-os/openclaw-routing-yaml.git"
   },
-  "homepage": "https://github.com/glasshouse-group/openclaw-routing-yaml",
+  "homepage": "https://github.com/glasshousehq-os/openclaw-routing-yaml#readme",
   "bugs": {
-    "url": "https://github.com/glasshouse-group/openclaw-routing-yaml/issues"
+    "url": "https://github.com/glasshousehq-os/openclaw-routing-yaml/issues"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -68,7 +68,9 @@
     "vitest": "^1.6.0"
   },
   "openclaw": {
-    "extensions": ["./dist/index.js"],
+    "extensions": [
+      "./dist/index.js"
+    ],
     "compat": {
       "pluginApi": ">=2026.3.24-beta.2",
       "minGatewayVersion": "2026.3.24-beta.2"
@@ -77,5 +79,8 @@
       "openclawVersion": "2026.3.24-beta.2",
       "pluginSdkVersion": "2026.3.24-beta.2"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

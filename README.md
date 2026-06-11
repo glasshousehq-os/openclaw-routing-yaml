@@ -54,10 +54,10 @@ ClawHub or npm.
 
 ```bash
 # Via ClawHub (once published).
-openclaw plugins install clawhub:openclaw-routing-yaml
+openclaw plugins install clawhub:@glasshousehq/openclaw-routing-yaml
 
 # Or via npm.
-openclaw plugins install npm:openclaw-routing-yaml
+openclaw plugins install npm:@glasshousehq/openclaw-routing-yaml
 
 # Or local development.
 openclaw plugins install --link ./openclaw-routing-yaml
